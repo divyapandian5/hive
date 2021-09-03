@@ -92,7 +92,7 @@ public class ATSV2Hook implements ExecuteWithHookContext {
       PerfLogger.GET_SPLITS, PerfLogger.RUN_TASKS,
   };
 
-  private static void setupAtsExecutor(HiveConf conf,TezAMRMClientAsync amRmClient) {
+  private static void setupAtsExecutor(HiveConf conf) {
     synchronized(LOCK) {
       if (executor == null) {
 
@@ -117,11 +117,18 @@ public class ATSV2Hook implements ExecuteWithHookContext {
         senderExecutor = new ThreadPoolExecutor(1, 1, 0, TimeUnit.MILLISECONDS, senderQueue, threadFactory);
 
         YarnConfiguration yarnConf = new YarnConfiguration();
-        ApplicationId app = ApplicationId.newInstance(0, Integer.parseInt("1010"));
         timelineClient = TimelineV2Client.createTimelineClient(ApplicationId.newInstance(0, 1));
         timelineClient.init(yarnConf);
         try{
-          timelineClient.setTimelineCollectorInfo(CollectorInfo.newInstance("0.0.0.0:8188"));
+          /*
+          After creating the timeline v2 client, user also needs to set the timeline collector info which contains the collector address
+           and collector token(only in secure mode) for the application.
+           If AMRMClient is used then by registering the timeline client by calling AMRMClient#registerTimelineV2Client is sufficient.
+Else address needs to be retrieved from the AM allocate response and need to be set in timeline client explicitly.
+
+timelineClient.setTimelineCollectorInfo(response.getCollectorInfo());
+           */
+          timelineClient.setTimelineCollectorInfo(CollectorInfo.newInstance("0.0.0.0:8188")); // Change to amclientrespose.getCollectorInfo()
           LOG.info("timelineV2Client inited.");
           //amRmClient.registerTimelineV2Client(timelineClient);
         }catch(Exception ex){
@@ -237,9 +244,8 @@ public class ATSV2Hook implements ExecuteWithHookContext {
     }
 
     try {
-      TezAMRMClientAsync amRmClient = TezAMRMClientAsyncProvider.getAMRMClientAsync();
-      LOG.info("amRmClient=" + amRmClient);
-      setupAtsExecutor(conf,amRmClient);
+     // TezAMRMClientAsync amRmClient = TezAMRMClientAsyncProvider.getAMRMClientAsync();
+      setupAtsExecutor(conf);
 
 //            final String domainId = createOrGetDomain(hookContext);
       executor.submit(new Runnable() {
